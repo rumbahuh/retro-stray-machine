@@ -1,3 +1,9 @@
+/*
+Authoress: Rebeca Castilla
+Date: 7-8/Nov/2025
+Goal: Generar comportamiento de máquina expendedora
+      usando arduino y ciertos sensores y actuadores
+*/
 #include <LiquidCrystal.h>
 
 // -- Pines de interrupciones
@@ -27,10 +33,10 @@ volatile unsigned long LOW_TO_HIGH_TIME = 0;
 volatile unsigned long HIGH_TO_LOW_TIME = 0;
 volatile bool button_ready = false;
 
-volatile unsigned long led_start = 0;
-volatile unsigned long led_time = 0;
-volatile bool led_finished_non_blocking_delay = false;
-volatile int counter = 0;
+// LED blink variables
+unsigned long previousMillis = 0;
+const long blinkInterval = 500;  // 500 ms on/off
+bool ledState = LOW;
 
 void button_pressed() {
   unsigned long now = millis();
@@ -80,6 +86,8 @@ void display(const char* message_to_display) {
 }
 
 void loop() {
+  unsigned long currentMillis = millis();
+
   switch (currentState) {
     case IDLE: {
       if (button_ready) {
@@ -90,81 +98,58 @@ void loop() {
       break;
     }
     case START: {
-      unsigned long millisStart = millis();
+      // static unsigned long startTime = 0;
+      // if (startTime == 0) startTime = millis();  // initialize once
 
       double pulseTime = getPulseTime();
       if (pulseTime <= 2.9) {
         if (previousState != currentState) {
           display("CARGANDO");
-          counter = 0;
-          digitalWrite(LED1, HIGH);
-          led_start = millis();
           previousState = currentState;
-        }
-
-        if (led_start > 0) {
-          unsigned long now = millis();
-          unsigned long elapsed = now - led_start;
-
-          if (elapsed >= 1000) {                     // toggle every 1 second
-            digitalWrite(LED1, !digitalRead(LED1));  // toggle LED
-            led_start = now;                         // reset timer
-
-            if (digitalRead(LED1) == LOW)
-              counter++;  // count full ON->OFF cycles
-          }
-
-          if (counter >= 3) {         // after 3 full ON->OFF cycles
-            digitalWrite(LED1, LOW);  // ensure LED is off
-            counter = 0;
-            led_start = 0;
-            currentState = SERVICE;
-            previousState = START;
-          }
         }
       } else if (pulseTime > 2.9 && pulseTime < 4.0) {
         currentState = ADMIN;
         previousState = START;
-      }
-      else {
+      } else {
         currentState = OPTIONS;
         previousState = START;
       }
       break;
-  }
+    }
 
-  case SERVICE: {
-    bool person_now_detected = false;
+    case SERVICE: {
+      bool person_now_detected = false;
 
-    double distance = get_distance();
-    if (distance < 1) person_now_detected = true;
+      double distance = get_distance();
+      if (distance < 1) person_now_detected = true;
 
-    if (first_iteration || person_now_detected != previously_detected_person) {
-      if (previousState != currentState) {
-        if (person_now_detected)
-          display("DETECTED");
-        else
-          display("ESPERANDO CLIENTE");
+      if (first_iteration ||
+          person_now_detected != previously_detected_person) {
+        if (previousState != currentState) {
+          if (person_now_detected)
+            display("DETECTED");
+          else
+            display("ESPERANDO CLIENTE");
 
-        previously_detected_person = person_now_detected;
-        first_iteration = false;
+          previously_detected_person = person_now_detected;
+          first_iteration = false;
+        }
+        previousState = currentState;
       }
-      previousState = currentState;
-    }
-  } break;
+    } break;
 
-  case ADMIN:
-    if (previousState != currentState) {
-      display("ADMIN");
-      previousState = currentState;
-    }
-    break;
+    case ADMIN:
+      if (previousState != currentState) {
+        display("ADMIN");
+        previousState = currentState;
+      }
+      break;
 
-  case OPTIONS:
-    if (previousState != currentState) {
-      display("OPTIONS");
-      previousState = currentState;
-    }
-    break;
-}
+    case OPTIONS:
+      if (previousState != currentState) {
+        display("OPTIONS");
+        previousState = currentState;
+      }
+      break;
+  }
 }
