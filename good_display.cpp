@@ -33,7 +33,7 @@ const double METER_LIGHT_SPEED_CONVERSION_FACTOR = 0.0001715;
 volatile bool previously_detected_person = false;
 volatile bool first_iteration = true;
 
-enum State { IDLE, START, SERVICE, ADMIN, OPTIONS , PREPARING, RETIRAR};
+enum State { IDLE, START, SERVICE, ADMIN, OPTIONS, PREPARING, RETIRAR };
 volatile State currentState = IDLE;
 volatile State previousState = IDLE;
 
@@ -196,17 +196,16 @@ void display(const char* message) {
   }
 }
 
-
 void displayProduct(const Product* p) {
-    char price_str[10];
-    char msg[32];
+  char price_str[10];
+  char msg[32];
 
-    // Para que no me de problemas de conversion busqué una función
-    // helper
-    dtostrf(p->price, 6, 2, price_str);
-    snprintf(msg, sizeof(msg), "%s%seur", p->line, price_str);
+  // Para que no me de problemas de conversion busqué una función
+  // helper
+  dtostrf(p->price, 6, 2, price_str);
+  snprintf(msg, sizeof(msg), "%s%seur", p->line, price_str);
 
-    display(msg);
+  display(msg);
 }
 
 void joystick_read(int choice) {
@@ -324,7 +323,7 @@ void prepararBebida(int time) {
 void loop() {
   now = millis();
 
-  /*Necesitamos que estas funciones se ejecuten continuamente 
+  /*Necesitamos que estas funciones se ejecuten continuamente
   si es que están activas para mantener dinamismo
   y aprovechar la alta fecuencia del bucle*/
   if (led_bool) {
@@ -371,29 +370,29 @@ void loop() {
       current_product->active = true;
     }
   }
-  
 
   // La máquina de estados siempre se encontrará en un estado
   switch (currentState) {
     case SERVICE: {
       product_or_admin = 1;
-      
+
       // Add an if on if  ledes on, turn off
       digitalWrite(LED1, LOW);
       digitalWrite(LED2, LOW);
       bool person_now_detected = false;
       double distance = get_distance();
       unsigned long millisStart = millis();
-      
+
       // Si es la primera iteración de SERVICE al entrar
       // y si el sensor de ultrasonidos ha tenido un cambio de estado
       if (first_iteration ||
           !person_now_detected != previously_detected_person) {
         // Este if creo que me sobra
         if (previousState != currentState) {
-          if (!person_now_detected) { // Cambiar boolean (era para implementarlo porque me daba errores)
+          if (!person_now_detected) {  // Cambiar boolean (era para
+                                       // implementarlo porque me daba errores)
             display("DETECTED");
-            if (first_iteration) { // Esta es redundant no?
+            if (first_iteration) {  // Esta es redundant no?
               previousState = currentState;
               current_product_index = 0;
               current_product = &products[current_product_index];
@@ -415,7 +414,7 @@ void loop() {
           if (current_product->active) {
             counter = 0;
             last_check_time = now;
-            
+
             preparation_time = random(4, 8);
             previousState = currentState;
             currentState = PREPARING;
@@ -425,26 +424,26 @@ void loop() {
       }
       break;
     }
-    
+
     case PREPARING: {
-            switch (current_product->id) {
-              case 0:
-                prepararBebida(preparation_time);
-                break;
-              case 1:
-                prepararBebida(preparation_time);
-                break;
-              case 2:
-                prepararBebida(preparation_time);
-                break;
-              case 3:
-                prepararBebida(preparation_time);
-                break;
-              case 4:
-                prepararBebida(preparation_time);
-                break;
-            }
-        break;
+      switch (current_product->id) {
+        case 0:
+          prepararBebida(preparation_time);
+          break;
+        case 1:
+          prepararBebida(preparation_time);
+          break;
+        case 2:
+          prepararBebida(preparation_time);
+          break;
+        case 3:
+          prepararBebida(preparation_time);
+          break;
+        case 4:
+          prepararBebida(preparation_time);
+          break;
+      }
+      break;
     }
 
     case RETIRAR: {
