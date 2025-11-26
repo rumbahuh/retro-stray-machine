@@ -13,19 +13,19 @@ It was implemented for educational purposes as a learning practice to use non bl
 ● 2 normal LEDs (LED1, LED2)
 ## Installation
 From teacher:
-'''
+```
 sudo apt update && sudo apt install libfuse-dev
-'''
+```
 Once you download your Arduino image from the Arduino page:
-'''
+```
 chmod +x arduino-ide_<version>.AppImage // Remember to change the version with yours
 sudo mv arduino-ide_2.3.6_Linux_64bit.AppImage /usr/local/bin/arduino // This way you can execute it as arduino
-'''
+```
 App launcher:
-'''
+```
 nano ~/.local/share/applications/arduino.desktop
-'''
-'''
+```
+```
 [Desktop Entry]
 Type=Application
 Name=IDE 2
@@ -38,7 +38,7 @@ Categories=Development;IDE;Electronics;
 MimeType=text/x-arduino;
 Keywords=embedded electronics;electronics;avr;microcontroller;
 StartupWMClass=processing-app-Base
-'''
+```
 Remember to change image with yours as well as names and exec if different
 ## Usage
 The usage is simple, once the wiring is set on your breadboard machine goes into SERVICE state.
