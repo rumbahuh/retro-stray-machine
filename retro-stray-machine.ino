@@ -123,7 +123,7 @@ volatile size_t PRODUCTS_SIZE =
 size_t current_product_index = INITIAL_INDEX;
 Product* current_product = &products[INITIAL_INDEX];
 
-const double CHANGING_VALUE_PRICE = 0.01;  // 1 cents.
+const double CHANGING_VALUE_PRICE = 0.05;  // 5 cents.
 const int RETIRAR_TIME = 3;
 const int MAX_PRICE_CHAR = 10;
 
@@ -167,7 +167,7 @@ bool first_iteration_product = true;
 bool showHumidityOnce = true;
 
 /*Maneja la interrupción del botón
-Guarda los tiempos entre estados de HIGH/LOW
+Guarda los tiempos entre estados de HIGH/LOW 
 para calcular la duración del pulso*/
 void button_pressed() {
   unsigned long now = millis();
@@ -207,6 +207,7 @@ void setup() {
   pinMode(PIN_ECHO, INPUT);
   pinMode(PIN_TRIG, OUTPUT);
   dht.begin();
+  randomSeed(analogRead(A5));
 
   attachInterrupt(digitalPinToInterrupt(pin), button_pressed, CHANGE);
   attachInterrupt(digitalPinToInterrupt(joystick), joystick_pressed, FALLING);
@@ -221,10 +222,11 @@ int getPulseTime() {
   return (LOW_TO_HIGH_TIME - HIGH_TO_LOW_TIME) / SECOND_CONVERSION_FACTOR;
 }
 
-/*Se ejecuta cuando el botón se suelta.
+/*Se ejecuta cuando el botón se suelta. 
 Cambia la flag del botón y determina acciones según
 la duración del pulso (resetear servicio y entrar/salir de admin)*/
 void button_unpressed() {
+  Serial.println("Button off");
   double pulseTime = getPulseTime();
 
   if (pulseTime >= TIME_RESET_SERVICE_INFIMO &&
@@ -623,7 +625,7 @@ void loop() {
           previousState = currentState;
           current_product_index = INITIAL_INDEX;
           current_product = &products[current_product_index];
-
+          
           /*La humedad/temperatura se muestra una sola vez durante 5s
           cuando un cliente se acerca. Después de eso se muestra el menú*/
           float h = dht.readHumidity();
@@ -643,7 +645,7 @@ void loop() {
             lcd.print(h);
           }
         } else {
-          display("ESPERANDO CLIENTE");
+          display("ESPERANDO       CLIENTE");
           showHumidityOnce = true;
         }
         previously_detected_person = person_now_detected;
@@ -732,3 +734,4 @@ void loop() {
     }
   }
 }
+
