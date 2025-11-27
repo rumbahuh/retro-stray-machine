@@ -34,7 +34,7 @@ const int THRESHOLD_JL_X = 0;
 const int THRESHOLD_JR_X = 1023;
 
 // -- ESTADOS
-enum State { IDLE, START, SERVICE, ADMIN, OPTIONS, PREPARING, RETIRAR, PRICES };
+enum State { IDLE, START, SERVICE, ADMIN, PREPARING, RETIRAR, PRICES };
 volatile State currentState = IDLE;
 volatile State previousState = IDLE;
 
@@ -45,14 +45,13 @@ const double TIME_RESET_SERVICE_SUPREMO = 3.0;
 const double TIME_CHANGE_STATE_ADMIN = 5.0;
 
 // -- FLAGS Y CANCELACION DE RUIDO (DEBOUNCE)
-volatile bool is_idle = true;
+bool is_idle = true;
 
 volatile unsigned long LOW_TO_HIGH_TIME = 0;  // Teniendo en cuenta que tengo
 volatile unsigned long HIGH_TO_LOW_TIME = 0;  // configurado los pines en PULLUP
 
 volatile bool button_ready =
     false;  // Si el botón no está siendo presionado => false
-volatile bool exit_satisfied = false;
 
 // ES NECESARIO ELIMINAR EL RUIDO DEL BOTÓN DEL JOYSTICK !!! WARNING
 volatile unsigned long last_joystick_press_time = 0;
@@ -68,9 +67,7 @@ const int LED1 = 11;
 const int LED2 = 6;
 
 unsigned long led_start = 0;
-unsigned long led_time = 0;
 
-bool led_finished_non_blocking_delay = false;
 int counter = 0;
 
 const int HIGH_VALUE_PWM = 255;
@@ -152,8 +149,6 @@ size_t current_admin_index = INITIAL_INDEX;
 Option* current_admin_option = &admin_options[INITIAL_INDEX];
 
 // -- VARIABLES GLOBALES
-int product_or_admin =
-    -1;  // Para la selección de las diferentes lecturas del joystick
 volatile double temporary_storage_for_mod_price_non_confirmed = 0;
 
 // Para un delay no bloqueante
@@ -171,64 +166,9 @@ bool first_iteration = true;
 bool first_iteration_product = true;
 bool showHumidityOnce = true;
 
-bool nonBlockingDelay(int target) {
-  if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
-    counter++;
-    last_check_time = now;
-  }
-
-  if (counter >= target) {
-    counter = 0;
-    return true;
-  }
-
-  return false;
-}
-
-int getPulseTime() {
-  return (LOW_TO_HIGH_TIME - HIGH_TO_LOW_TIME) / SECOND_CONVERSION_FACTOR;
-}
-
-void button_unpressed() {
-  double pulseTime = getPulseTime();
-
-  if (pulseTime >= TIME_RESET_SERVICE_INFIMO &&
-      pulseTime <= TIME_RESET_SERVICE_SUPREMO && (currentState == SERVICE)) {
-    currentState = SERVICE;
-    previousState = IDLE;
-
-    // Reseteo
-    current_product_index = INITIAL_INDEX;
-    current_product = &products[current_product_index];
-
-    first_iteration = true;
-    showHumidityOnce = true;
-
-    displayProduct(current_product);
-    is_idle = true;  // Para que no printee
-  } else if (pulseTime > TIME_CHANGE_STATE_ADMIN) {
-    if (currentState == ADMIN) {
-      currentState = SERVICE;
-      previousState = ADMIN;
-
-      first_iteration = true;  // Sin esto no vuelve a comprobar persona!
-      displayProduct(current_product);
-    } else {
-      currentState = ADMIN;
-      previousState = SERVICE;
-      first_iteration = true;
-      first_iteration_product = true;
-
-      current_admin_index = INITIAL_INDEX;
-      current_admin_option = &admin_options[current_admin_index];
-
-      display(current_admin_option->line);
-    }
-  }
-
-  button_ready = false;
-}
-
+/*Maneja la interrupción del botón
+Guarda los tiempos entre estados de HIGH/LOW
+para calcular la duración del pulso*/
 void button_pressed() {
   unsigned long now = millis();
 
@@ -241,16 +181,17 @@ void button_pressed() {
   }
 }
 
-// AHORA CON DEBOUNCE
+/*Maneja la interrupción del botón del joystick con debounce.
+Asegura que solo se registren pulsaciones válidas.*/
 void joystick_pressed() {
   unsigned long now = millis();
 
   // Comprobamos el tiempo entre el ruido
+  // Si es el tiempo es menor que el estipulado => es ruido
   if (now - last_joystick_press_time > JOYSTICK_DEBOUNCE_DELAY) {
     last_joystick_press_time = now;
     joystick_bool = true;
   }
-  // Si es el tiempo es menor que el estipulado, es ruido
 }
 
 void setup() {
@@ -274,6 +215,58 @@ void setup() {
   START_TIME = millis();
 }
 
+/*Calcula la duración total del pulso del botón en segundos,
+usando los tiempos registrados previamente.*/
+int getPulseTime() {
+  return (LOW_TO_HIGH_TIME - HIGH_TO_LOW_TIME) / SECOND_CONVERSION_FACTOR;
+}
+
+/*Se ejecuta cuando el botón se suelta.
+Cambia la flag del botón y determina acciones según
+la duración del pulso (resetear servicio y entrar/salir de admin)*/
+void button_unpressed() {
+  double pulseTime = getPulseTime();
+
+  if (pulseTime >= TIME_RESET_SERVICE_INFIMO &&
+      pulseTime <= TIME_RESET_SERVICE_SUPREMO && (currentState == SERVICE)) {
+    currentState = SERVICE;
+    previousState = IDLE;
+
+    // Reseteo
+    current_product_index = INITIAL_INDEX;
+    current_product = &products[current_product_index];
+
+    first_iteration = true;
+    showHumidityOnce = true;
+
+    displayProduct(current_product);
+    is_idle = true;
+  } else if (pulseTime > TIME_CHANGE_STATE_ADMIN) {
+    if (currentState == ADMIN) {
+      currentState = SERVICE;
+      previousState = ADMIN;
+
+      first_iteration = true;
+      displayProduct(current_product);
+    } else {
+      currentState = ADMIN;
+      previousState = SERVICE;
+      first_iteration = true;
+      first_iteration_product = true;
+
+      current_admin_index = INITIAL_INDEX;
+      current_admin_option = &admin_options[current_admin_index];
+
+      display(current_admin_option->line);
+    }
+  }
+
+  button_ready = false;
+}
+
+/*Mide la distancia usando el sensor de ultrasonidos.
+Envía un pulso TRIG y calcula metros a partir del ECHO*/
+// Reutilizado de práctica de Sensores y Actuadores
 double get_distance() {
   digitalWrite(PIN_TRIG, LOW);
   delayMicroseconds(2);
@@ -284,6 +277,8 @@ double get_distance() {
   return dis * METER_SOUND_SPEED_CONVERSION_FACTOR;
 }
 
+/*Muestra un mensaje (de máximo 32 caracteres) en la pantalla LCD 16x2,
+dividiendo automáticamente entre las dos líneas.*/
 void display(const char* message) {
   // Uso const char* en lugar de String
   // para no alocar dinámicamente
@@ -306,6 +301,8 @@ void display(const char* message) {
   }
 }
 
+/*Muestra un producto en la LCD, formateando nombre, precio
+en un mensaje truncado a la pantalla*/
 void displayProduct(const Product* p) {
   char price_str[MAX_PRICE_CHAR];
   char msg[LCD_MAX_CHARS];
@@ -318,6 +315,8 @@ void displayProduct(const Product* p) {
   display(msg);
 }
 
+/*Detecta el movimiento del joystick (ARRIBA/ABAJO/IZQ/DER)
+según los umbrales definidos para los ejes X e Y*/
 JoystickMove detect_move(int x, int y) {
   if (x >= CENTER_X_MIN && x <= CENTER_X_MAX && y >= CENTER_Y_MIN &&
       y <= CENTER_Y_MAX)
@@ -339,6 +338,8 @@ JoystickMove detect_move(int x, int y) {
   return JS_CENTER;
 }
 
+/*Maneja movimientos ARRIBA/ABAJO en modo SERVICIO,
+permitiendo navegar entre los productos*/
 void handle_service_move(JoystickMove move) {
   if (move == JS_UP && current_product_index > INITIAL_INDEX) {
     current_product_index--;
@@ -353,6 +354,9 @@ void handle_service_move(JoystickMove move) {
   }
 }
 
+/*Maneja movimientos ARRIBA/ABAJO/IZQ en modo ADMIN,
+permitiendo navegar entre las opciones
+y salir de la ejecución de dichas*/
 void handle_admin_move(JoystickMove move) {
   if (move == JS_UP && current_admin_index > INITIAL_INDEX &&
       !current_admin_option->active) {
@@ -374,6 +378,11 @@ void handle_admin_move(JoystickMove move) {
   }
 }
 
+/*Maneja movimientos ARRIBA/ABAJO/IZQ en modo PRICES,
+permitiendo navegar por el menú de productos
+para permitir la modificación de los precios,
+cancelando movimiento el joystick a la izquierda
+y confirmando pulsando el botón del Joystick*/
 void handle_prices_move(JoystickMove move) {
   if (move == JS_UP) {
     if (current_product->active) {
@@ -417,7 +426,10 @@ void handle_prices_move(JoystickMove move) {
   }
 }
 
-void joystick_read(int choice) {
+/*Lee el joystick, detecta salidas del punto central,
+y envía el movimiento a la función correspondiente
+según el estado actual de la máquina*/
+void joystick_read() {
   int x = analogRead(Vx);
   int y = analogRead(Vy);
 
@@ -443,12 +455,30 @@ void joystick_read(int choice) {
   }
 
   is_idle = true;  // Solo aceptamos cambios cuando el joystick
-                   // pasa de centro a otra posición dentro de los threadholds
+                   // pasa de centro a otra posición dentro de los threshholds
                    // especificados
 }
 
+/*Implementa un “delay” no bloqueante contando segundos con millis(),
+permitiendo ejecutar acciones sin detener el loop()*/
+bool nonBlockingDelay(int target) {
+  if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
+    counter++;
+    last_check_time = now;
+  }
+
+  if (counter >= target) {
+    counter = 0;
+    return true;
+  }
+
+  return false;
+}
+
+/*Muestra temperatura y humedad en la LCD cada segundo*/
 void displayTemp() {
-  if (nonBlockingDelay(1)) {
+  const int interval_time = 1;
+  if (nonBlockingDelay(interval_time)) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Temp: ");
@@ -459,14 +489,18 @@ void displayTemp() {
   }
 }
 
+/*Muestra la distancia medida por ultrasonidos cada segundo*/
 void displayDist() {
-  if (nonBlockingDelay(1)) {
+  const int interval_time = 1;
+  if (nonBlockingDelay(interval_time)) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(get_distance());
   }
 }
 
+/*Muestra el contador interno (tiempo desde el arranque)
+en la LCD, actualizado cada segundo*/
 void seeCounter() {
   const int interval_time = 1;
   if (nonBlockingDelay(interval_time)) {
@@ -477,15 +511,8 @@ void seeCounter() {
   }
 }
 
-void modifyPrice() {
-  if (first_iteration_product) {
-    current_product_index = INITIAL_INDEX;
-    current_product = &products[current_product_index];
-    displayProduct(current_product);
-    first_iteration_product = false;
-  }
-}
-
+/*Gestiona el estado RETIRAR: cuenta unos 3 segundos,
+apaga LEDs y vuelve al modo SERVICIO después*/
 void retirarBebida() {
   if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
     counter++;
@@ -501,6 +528,10 @@ void retirarBebida() {
     currentState = SERVICE;
   }
 }
+
+/*Gestiona el estado PREPARING: aumenta gradualmente
+la intensidad del LED y, al terminar el tiempo,
+pasa al estado RETIRAR*/
 void prepararBebida(int time) {
   if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
     counter++;
@@ -580,23 +611,21 @@ void loop() {
   // La máquina de estados siempre se encontrará en un estado
   switch (currentState) {
     case SERVICE: {
-      product_or_admin = 1;
-
       // Add an if on if  ledes on, turn off
       analogWrite(LED1, LOW_VALUE_PWM);
       analogWrite(LED2, LOW_VALUE_PWM);
       double distance = get_distance();
       bool person_now_detected = (distance < PERSON_DETECTION_MAX_DISTANCE);
 
-      unsigned long millisStart = millis();
-
       // Si el sensor de ultrasonidos ha tenido un cambio de estado
       if (person_now_detected != previously_detected_person) {
-        // Este if creo que me sobra
         if (person_now_detected) {
           previousState = currentState;
           current_product_index = INITIAL_INDEX;
           current_product = &products[current_product_index];
+
+          /*La humedad/temperatura se muestra una sola vez durante 5s
+          cuando un cliente se acerca. Después de eso se muestra el menú*/
           float h = dht.readHumidity();
           float t = dht.readTemperature();
 
@@ -626,7 +655,7 @@ void loop() {
           displayProduct(current_product);
         }
       } else if (person_now_detected && !showHumidityOnce) {
-        joystick_read(product_or_admin);
+        joystick_read();
 
         if (current_product->active) {
           counter = 0;
@@ -652,8 +681,6 @@ void loop() {
     }
 
     case ADMIN: {
-      product_or_admin = 0;
-
       if (previousState != currentState) {
         if (first_iteration) {
           previousState = currentState;
@@ -665,7 +692,7 @@ void loop() {
           first_iteration = false;
         }
       }
-      joystick_read(product_or_admin);
+      joystick_read();
 
       if (current_admin_option->active) {
         switch (current_admin_option->id) {
@@ -689,8 +716,6 @@ void loop() {
     }
 
     case PRICES: {
-      product_or_admin = 1;  // Va a modificar los precios
-
       if (previousState != currentState) {
         if (first_iteration) {
           previousState = currentState;
@@ -700,7 +725,7 @@ void loop() {
           first_iteration = false;
         }
       }
-      joystick_read(product_or_admin);
+      joystick_read();
 
       previousState = currentState;
       break;
