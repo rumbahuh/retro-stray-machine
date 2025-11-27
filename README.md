@@ -46,6 +46,6 @@ See schema.
 - Non-nlocking programming using millis() and state machines
 
 ## Credits
-- Joystick: Used a 4-legged dual-axis joystick model found online
+- Joystick: Used a 5-legged dual-axis joystick model found online
 - DHT11: Used a 3-legged sensor model found online
 - Fritzing: For wiring references and schema design
