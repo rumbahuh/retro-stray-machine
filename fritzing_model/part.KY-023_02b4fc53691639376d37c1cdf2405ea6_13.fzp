@@ -1,0 +1,138 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<module moduleId="KY-023_02b4fc53691639376d37c1cdf2405ea6_13" referenceFile="generic_ic_dip_4_300mil.fzp">
+ <version>4</version>
+ <author>arduinomodules.info</author>
+ <title>KY-023 Dual Axis Joystick Module</title>
+ <label>Mod</label>
+ <date>Tue Oct 27 2020</date>
+ <tags>
+  <tag>Joystick</tag>
+  <tag>KY-023</tag>
+  <tag>arduinomodules.info</tag>
+  <tag>contrib</tag>
+  <tag>Dual Axis</tag>
+  <tag>37 in 1 Sensors Modules Kit</tag>
+ </tags>
+ <properties>
+  <property name="variant">variant 1</property>
+  <property name="family">KY-023</property>
+  <property name="editable pin labels">false</property>
+  <property name="pins">5</property>
+  <property name="chip label">KY-023</property>
+  <property name="package">Breakout board</property>
+  <property name="layer"></property>
+  <property name="operating voltage">3.3V to 5.5V</property>
+  <property name="hole size"></property>
+  <property name="pin spacing">300mil</property>
+  <property name="board dimensions">26mm x 34mm</property>
+  <property name="part number"></property>
+ </properties>
+ <taxonomy>part.dip.4.pins</taxonomy>
+ <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
+&lt;html>&lt;head>&lt;meta name="qrichtext" content="1" />&lt;style type="text/css">
+p, li { white-space: pre-wrap; }
+&lt;/style>&lt;/head>&lt;body style=" font-family:'MS Shell Dlg 2'; font-size:7.875pt; font-weight:400; font-style:normal;">
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">KY-023 Dual-Axis Joystick Module.&lt;/p>&lt;/body>&lt;/html></description>
+ <views>
+  <iconView>
+   <layers image="icon/KY-023_c7d4b49f09e18c2d64a2f234e3cfec7a_1_icon.svg">
+    <layer layerId="icon"/>
+   </layers>
+  </iconView>
+  <breadboardView>
+   <layers image="breadboard/KY-023_c7d4b49f09e18c2d64a2f234e3cfec7a_1_breadboard.svg">
+    <layer layerId="breadboard"/>
+   </layers>
+  </breadboardView>
+  <schematicView>
+   <layers image="schematic/KY-023_c7d4b49f09e18c2d64a2f234e3cfec7a_1_schematic.svg">
+    <layer layerId="schematic"/>
+   </layers>
+  </schematicView>
+  <pcbView>
+   <layers image="pcb/KY-023_c7d4b49f09e18c2d64a2f234e3cfec7a_1_pcb.svg">
+    <layer layerId="silkscreen"/>
+    <layer layerId="copper0"/>
+    <layer layerId="copper1"/>
+   </layers>
+  </pcbView>
+ </views>
+ <connectors>
+  <connector type="male" name="GND" id="connector0">
+   <description>Ground</description>
+   <views>
+    <breadboardView>
+     <p terminalId="connector0terminal" svgId="connector0pin" layer="breadboard"/>
+    </breadboardView>
+    <schematicView>
+     <p terminalId="connector0terminal" svgId="connector0pin" layer="schematic"/>
+    </schematicView>
+    <pcbView>
+     <p svgId="connector0pin" layer="copper0"/>
+     <p svgId="connector0pin" layer="copper1"/>
+    </pcbView>
+   </views>
+  </connector>
+  <connector type="male" name="+5V" id="connector1">
+   <description>Power</description>
+   <views>
+    <breadboardView>
+     <p terminalId="connector1terminal" svgId="connector1pin" layer="breadboard"/>
+    </breadboardView>
+    <schematicView>
+     <p terminalId="connector1terminal" svgId="connector1pin" layer="schematic"/>
+    </schematicView>
+    <pcbView>
+     <p svgId="connector1pin" layer="copper0"/>
+     <p svgId="connector1pin" layer="copper1"/>
+    </pcbView>
+   </views>
+  </connector>
+  <connector type="male" name="VRx" id="connector2">
+   <description>X axis</description>
+   <views>
+    <breadboardView>
+     <p terminalId="connector2terminal" svgId="connector2pin" layer="breadboard"/>
+    </breadboardView>
+    <schematicView>
+     <p terminalId="connector2terminal" svgId="connector2pin" layer="schematic"/>
+    </schematicView>
+    <pcbView>
+     <p svgId="connector2pin" layer="copper0"/>
+     <p svgId="connector2pin" layer="copper1"/>
+    </pcbView>
+   </views>
+  </connector>
+  <connector type="male" name="VRy" id="connector3">
+   <description>Y axis</description>
+   <views>
+    <breadboardView>
+     <p terminalId="connector3terminal" svgId="connector3pin" layer="breadboard"/>
+    </breadboardView>
+    <schematicView>
+     <p terminalId="connector3terminal" svgId="connector3pin" layer="schematic"/>
+    </schematicView>
+    <pcbView>
+     <p svgId="connector3pin" layer="copper0"/>
+     <p svgId="connector3pin" layer="copper1"/>
+    </pcbView>
+   </views>
+  </connector>
+  <connector type="male" name="SW" id="connector4">
+   <description>Switch</description>
+   <views>
+    <breadboardView>
+     <p terminalId="connector4terminal" svgId="connector4pin" layer="breadboard"/>
+    </breadboardView>
+    <schematicView>
+     <p terminalId="connector4terminal" svgId="connector4pin" layer="schematic"/>
+    </schematicView>
+    <pcbView>
+     <p svgId="connector4pin" layer="copper0"/>
+     <p svgId="connector4pin" layer="copper1"/>
+    </pcbView>
+   </views>
+  </connector>
+ </connectors>
+ <url>https://arduinomodules.info/ky-023-joystick-dual-axis-module</url>
+</module>
