@@ -461,7 +461,7 @@ void joystick_read() {
                    // especificados
 }
 
-/*Implementa un “delay” no bloqueante contando segundos con millis(),
+/*Implementa un delay no bloqueante contando segundos con millis(),
 permitiendo ejecutar acciones sin detener el loop()*/
 bool nonBlockingDelay(int target) {
   if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
@@ -734,4 +734,3 @@ void loop() {
     }
   }
 }
-
