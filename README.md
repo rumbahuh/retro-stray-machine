@@ -1,52 +1,49 @@
 # retro-stray-machine
 ## Description
-This project is meant to implement different learning methods of Real Time Sytems to simulate a vending machine behaviour using different sensors and actuators.
-It was implemented for educational purposes as a learning practice to use non blocking programming.
+This project is meant to implement different learning methods of Real-Time Sytems to simulate a vending machine behaviour using sensors and actuators.
+It was implemented for educational purposes to practice to use non-blocking interrupts, and state machine logic on an Arduino platform.
+
+The vending machine can:
+- Detect the nearby person using the ultrasonic sensor
+- Display temperature and humidity using DHT11 sensor
+- Navigate and select products or admin options using a joystick
+- Modify product prices in admin mode
+- Simulate preparation and delivery of drinks using intensity of LED2
 ## Demo
+## Technical Report & Difficulties
+
 ## Components
 ● Arduino UNO
 ● LCD
-● Joystick
+● Joystick (4 legs, dual-axis)
 ● DHT11 Sensor for Temperature/Humidity
-● Ultrasonic Sensor
-● Button
+● Ultrasonic Sensor (HC-SR04)
+● Push Button
 ● 2 normal LEDs (LED1, LED2)
-## Installation
-From teacher:
-```
-sudo apt update && sudo apt install libfuse-dev
-```
-Once you download your Arduino image from the Arduino page:
-```
-chmod +x arduino-ide_<version>.AppImage // Remember to change the version with yours
-sudo mv arduino-ide_2.3.6_Linux_64bit.AppImage /usr/local/bin/arduino // This way you can execute it as arduino
-```
-App launcher:
-```
-nano ~/.local/share/applications/arduino.desktop
-```
-```
-[Desktop Entry]
-Type=Application
-Name=IDE 2
-GenericName=Arduino IDE
-Comment=Open-source electronics prototyping platform
-Exec=/usr/local/bin/arduino
-Icon=<path/to/arduino/icon/arduino2.png>
-Terminal=false
-Categories=Development;IDE;Electronics;
-MimeType=text/x-arduino;
-Keywords=embedded electronics;electronics;avr;microcontroller;
-StartupWMClass=processing-app-Base
-```
-Remember to change image with yours as well as names and exec if different
 ## Usage
-The usage is simple, once the wiring is set on your breadboard machine goes into SERVICE state.
-You can navigate every menu by moving your joystick up and down. To cancel every action but preparation of the service state implementations it's as simple as moving the joystick left, and to choose an option pressing the own joystick.
-As a note: To confirm price change on admin menu you must press the button a second time.
+The usage is simple, once the wiring is set on the breadboard, the machine goes into SERVICE state.
+Use the joystick to navigate menus:
+- UP/DOWN: Move selection (if modifying prices, up and down will show the increase/decrease of price in cents)
+- LEFT: Cancel action (except during preparation)
+- Press joyistick: Confirm selection / Confirm price change
 ## Wiring
 See schema.
+
+- LCD: RS=12, E=13, D4=5, D5=4, D6=8, D7=7
+- Joystick: Vx=A0, Vy=A1, Button=3
+- Push Button: 2
+- LED1: 11
+- LED2: 6
+- HC-SR04: Trig=9, Echo=10
+- DHT11: A3
+
 ## Tech Stack
-Ive used Ada fruit DHT sensor library,
+- Arduino UNO
+- Adafruit DHT Sensor Library
+- LiquidCrystal Library
+- Non-nlocking programming using millis() and state machines
+
 ## Credits
-For the schema, I had to search for an fritcing model for the 1PC Dual joystick. I cant upload it, but its important to know I used a four legged one.
+- Joystick: Used a 4-legged dual-axis joystick model found online
+- DHT11: Used a 3-legged sensor model found online
+- Fritzing: For wiring references and schema design
