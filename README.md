@@ -9,7 +9,7 @@ The vending machine can:
 - Navigate and select products or admin options using a joystick
 - Modify product prices in admin mode
 - Simulate preparation and delivery of drinks using intensity of LED2
-## Demo
+## [Demo (not mirrored video)](https://youtu.be/FylNRDOHbrw)
 https://github.com/user-attachments/assets/e2b0b2d0-d37c-4b72-8244-d0df8db178bc
 
 ## Technical Report & Difficulties
