@@ -23,10 +23,15 @@ The interesting part of this is that the system can indicate progress while stil
 
 ### Differences in structs & LCD
 Products and Admin Options are stored in separate structs. This was the simplest way to handle price and menu data, since parsing between chars and ints would be error-prone and unnecessarily complex. Using structs makes it easy to modify, access, or extend data without risking conversion mistakes.
+A temporary variable is used for price changes so the user can confirm or cancel modifications before applying them. Although I know this is not the best approach, I considered unsafe creating a copy of the struct as I aimed towards consuming less memory. I also avoided using the String class to prevent dynamic memory allocation on the Arduino for the same reasons.
 
 As for the LCD, it is used to show system status, sensor readings, product lists, and menus. With the limit that no message to display could be longer than 16 characters (match columns on screen); if the case, those are split across the two rows of the screen to fit the display, making sure all information is readable.
 I must say due to lack of time I simply added more spaces in some messages to make them fit, and I am painfully aware that a proper implementation would have been more elegant, even if not directly related to real-time systems.
 
+### Other & Difficulties
+The main difficulty was that the system is complex, with many things happening at once. Getting started was not easy, and at first it was hard to know which parts to implement and in what order. I had a safe draft in the first four days, but a bit more guidance would have been helpful to decide what was best not to implement. I ran into a similar issue before with handling chars in Operating Systems, so some decisions about data representation, like with the LCD or prices, felt tricky at first, and I know it's messy.
+
+Otherwise, the project was really fun and interesting to work on. I was very motivated, which is why I feel a bit disappointed knowing it could have been better.
 
 ## [Demo (not mirrored video)](https://youtu.be/FylNRDOHbrw)
 https://github.com/user-attachments/assets/e2b0b2d0-d37c-4b72-8244-d0df8db178bc
