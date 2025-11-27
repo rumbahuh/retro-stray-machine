@@ -2,73 +2,105 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include <LiquidCrystal.h>
+#include <avr/wdt.h>
 
 #define DHTTYPE DHT11
 
-const int pin = 2;  // Interrupción -- Botón
-
-// -- Pines de Joystick
+// -- INTERRUPCIONES
+const int pin = 2;       // Interrupción -- Botón
 const int joystick = 3;  // Interrupción -- Botón de joystick
+
+// -- JOYSTICK
 const int Vx = A0;
 const int Vy = A1;
 
-const int CENTER_X_MIN =
-    450;  // Me da valores diferentes cada vez que lo conecto
+const int CENTER_X_MIN = 450;
 const int CENTER_X_MAX = 510;
 const int CENTER_Y_MIN = 450;
 const int CENTER_Y_MAX = 510;
 
-volatile bool is_idle = true;
-// -- Pines de ledes
-const int LED1 = 11;
-const int LED2 = 6;
+const int THRESHOLD_JU_XSUPREMO = 1100;  // Acotaciones de U/D variaban más
+const int THRESHOLD_JU_XINFIMO = 220;
+const int THRESHOLD_JU_Y = 0;
 
-// -- Pines de pantalla lcd
-LiquidCrystal lcd(12, 13, 5, 4, 8, 7);
+const int THRESHOLD_JD_XSUPREMO = 900;
+const int THRESHOLD_JD_XINFIMO = 200;
+const int THRESHOLD_JD_Y = 920;
 
-// -- Pines de sensor de ultrasonidos
-const int PIN_TRIG = 9;
-const int PIN_ECHO = 10;
+const int THRESHOLD_JLJR_YSUPREMO = 1010;  // Acotaciones iguales para L/R
+const int THRESHOLD_JLJR_YINFIMO = 243;
+const int THRESHOLD_JL_X = 0;
 
-// -- Pines de sensor de humedad
-const int DHTPIN = A3;  // Uso analógico porque no me quedan más pines
-DHT dht(DHTPIN, DHTTYPE);
+const int THRESHOLD_JR_X = 1023;
 
-const double METER_LIGHT_SPEED_CONVERSION_FACTOR = 0.0001715;
-
-volatile bool previously_detected_person = false;
-volatile bool first_iteration = true;
-volatile bool first_iteration_product = true;
-
+// -- ESTADOS
 enum State { IDLE, START, SERVICE, ADMIN, OPTIONS, PREPARING, RETIRAR, PRICES };
 volatile State currentState = IDLE;
 volatile State previousState = IDLE;
 
 typedef enum { JS_CENTER, JS_UP, JS_DOWN, JS_LEFT, JS_RIGHT } JoystickMove;
 
-/*Teniendo en cuenta que tengo configurado los pines en PULLUP*/
-volatile unsigned long LOW_TO_HIGH_TIME = 0;
-volatile unsigned long HIGH_TO_LOW_TIME = 0;
+const double TIME_RESET_SERVICE_INFIMO = 2.0;
+const double TIME_RESET_SERVICE_SUPREMO = 3.0;
+const double TIME_CHANGE_STATE_ADMIN = 5.0;
 
-// Si el botón no está siendo presionado
-volatile bool button_ready = false;
-// Si se puede salir del estado
+// -- FLAGS Y CANCELACION DE RUIDO (DEBOUNCE)
+volatile bool is_idle = true;
+
+volatile unsigned long LOW_TO_HIGH_TIME = 0;  // Teniendo en cuenta que tengo
+volatile unsigned long HIGH_TO_LOW_TIME = 0;  // configurado los pines en PULLUP
+
+volatile bool button_ready =
+    false;  // Si el botón no está siendo presionado => false
 volatile bool exit_satisfied = false;
 
 // ES NECESARIO ELIMINAR EL RUIDO DEL BOTÓN DEL JOYSTICK !!! WARNING
 volatile unsigned long last_joystick_press_time = 0;
-const unsigned long JOYSTICK_DEBOUNCE_DELAY = 150; // ms
+const unsigned long JOYSTICK_DEBOUNCE_DELAY = 150;  // ms
 
-// -- Sobre lógica de delays de las ledes
-volatile unsigned long led_start = 0;
-volatile unsigned long led_time = 0;
-volatile bool led_finished_non_blocking_delay = false;
-volatile int counter = 0;
-
+// Cambiarán según las interrupciones correspondientes
+// Después actuán en loop()
 volatile bool led_bool = true;
-
 volatile bool joystick_bool = false;
 
+// -- LEDS
+const int LED1 = 11;
+const int LED2 = 6;
+
+unsigned long led_start = 0;
+unsigned long led_time = 0;
+
+bool led_finished_non_blocking_delay = false;
+int counter = 0;
+
+const int HIGH_VALUE_PWM = 255;
+const int LOW_VALUE_PWM = 0;
+const int LED_BLINK_COUNT = 3;
+
+// -- LCD
+LiquidCrystal lcd(12, 13, 5, 4, 8, 7);
+const int MAX_CHARPTR_PER_SCREEN = 16;
+const int LCD_MAX_CHARS = 32;
+
+// -- ULTRASONIDOS
+const int PIN_TRIG = 9;
+const int PIN_ECHO = 10;
+const int PERSON_DETECTION_MAX_DISTANCE = 1;  // 1m
+
+// Esto lo he reutilizado de mi práctica de sensores del año pasado
+const double METER_SOUND_SPEED_CONVERSION_FACTOR = 0.0001715;
+
+bool previously_detected_person =
+    true;  // Empieza en true porque getDistance la primera iteracion será falsa
+
+// -- SENSOR DE HUMEDAD
+const int DHTPIN = A3;  // Uso analógico porque no me quedan más pines
+DHT dht(DHTPIN, DHTTYPE);
+
+// -- PRODUCTOS
+// Me era mucho más cómodo trabajar con un struct
+// pero podría haber implemenatdo otra manera
+// era por comodidad
 struct Product {
   const char* line;
   float price;
@@ -76,50 +108,71 @@ struct Product {
   volatile bool active;
 };
 
+Product products[] = {{"i.CafeSolo", 1.00, 0, false},
+                      {"ii.Cafe Cortado", 1.10, 1, false},
+                      {"iii.Cafe Doble", 1.25, 2, false},
+                      {"iv.Cafe Premium", 1.50, 3, false},
+                      // Añado un espacio para que se vea mejor simplemente
+                      {"v.Chocolate     ", 2.00, 4, false}};
+
+size_t INITIAL_INDEX = 0;
+
+// El size es importante para cuando trabaje con punteros
+// sobre movimiento de joystick para navegar el menú
+// Si no lo tengo en cuenta => undefined behaviour
+volatile size_t PRODUCTS_SIZE =
+    sizeof(products) / sizeof(products[INITIAL_INDEX]);
+
+size_t current_product_index = INITIAL_INDEX;
+Product* current_product = &products[INITIAL_INDEX];
+
+const double CHANGING_VALUE_PRICE = 0.01;  // 1 cents.
+const int RETIRAR_TIME = 3;
+const int MAX_PRICE_CHAR = 10;
+
+const int PREP_TIME_MIN = 4;
+const int PREP_TIME_MAX = 8;
+
+// -- ADMIN
 struct Option {
   const char* line;
   int id;
   volatile bool active;
 };
 
-volatile Product products[] = {{"i.CafeSolo", 1.00, 0, false},
-                               {"ii.Cafe Cortado", 1.10, 1, false},
-                               {"iii.Cafe Doble", 1.25, 2, false},
-                               {"iv.Cafe Premium", 1.50, 3, false},
-                               {"v.Chocolate     ", 2.00, 4, false}};
-
-bool product_or_admin = -1;
-volatile double temporary_storage_for_mod_price_non_confirmed = 0;
-
-volatile size_t PRODUCTS_SIZE = sizeof(products) / sizeof(products[0]);
-
 const Option admin_options[] = {{"i.Ver temperatura", 0, false},
                                 {"ii.Ver distancia sensor", 1, false},
                                 {"iii.Ver contador", 2, false},
                                 {"iv.Modificar precios", 3, false}};
 
-volatile size_t current_product_index = 0;
-volatile size_t current_admin_index = 0;
-
-// Punteros globales para selección
-volatile Product* current_product = &products[0];
-volatile Option* current_admin_option = &admin_options[0];
-
 const size_t ADMIN_OPTIONS_SIZE =
-    sizeof(admin_options) / sizeof(admin_options[0]);
+    sizeof(admin_options) / sizeof(admin_options[INITIAL_INDEX]);
 
+size_t current_admin_index = INITIAL_INDEX;
+Option* current_admin_option = &admin_options[INITIAL_INDEX];
+
+// -- VARIABLES GLOBALES
+int product_or_admin =
+    -1;  // Para la selección de las diferentes lecturas del joystick
+volatile double temporary_storage_for_mod_price_non_confirmed = 0;
+
+// Para un delay no bloqueante
 unsigned long START_TIME = 0;
-volatile unsigned long last_check_time = 0;
-volatile unsigned long now = 0;
+unsigned long last_check_time = 0;
+unsigned long now = 0;
 
-volatile bool current_admin_option_activated = false;
-volatile bool current_product_option_activated = false;
+int preparation_time = 0;
+int increasing_led_value = 0;  // Intensidad
 
-volatile int preparation_time = 0;
-volatile int increasing_led_value = 0;
+const unsigned long SECOND_CONVERSION_FACTOR = 1000;
+
+// -- LÓGICA
+bool first_iteration = true;
+bool first_iteration_product = true;
+bool showHumidityOnce = true;
 
 bool nonBlockingDelay(int target) {
-  if (now - last_check_time >= 1000.0) {
+  if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
     counter++;
     last_check_time = now;
   }
@@ -132,27 +185,44 @@ bool nonBlockingDelay(int target) {
   return false;
 }
 
-int getPulseTime() { return (LOW_TO_HIGH_TIME - HIGH_TO_LOW_TIME) / 1000.0; }
+int getPulseTime() {
+  return (LOW_TO_HIGH_TIME - HIGH_TO_LOW_TIME) / SECOND_CONVERSION_FACTOR;
+}
 
 void button_unpressed() {
-  Serial.println("Button was released");
   double pulseTime = getPulseTime();
 
-  if (pulseTime >= 2.0 && pulseTime <= 3.0) {
+  if (pulseTime >= TIME_RESET_SERVICE_INFIMO &&
+      pulseTime <= TIME_RESET_SERVICE_SUPREMO && (currentState == SERVICE)) {
     currentState = SERVICE;
-    first_iteration = true;
     previousState = IDLE;
-  } else if (pulseTime > 5) {
+
+    // Reseteo
+    current_product_index = INITIAL_INDEX;
+    current_product = &products[current_product_index];
+
+    first_iteration = true;
+    showHumidityOnce = true;
+
+    displayProduct(current_product);
+    is_idle = true;  // Para que no printee
+  } else if (pulseTime > TIME_CHANGE_STATE_ADMIN) {
     if (currentState == ADMIN) {
       currentState = SERVICE;
       previousState = ADMIN;
-      first_iteration = true;  // Sin esto no vuelve a comprobar persona!
 
+      first_iteration = true;  // Sin esto no vuelve a comprobar persona!
+      displayProduct(current_product);
     } else {
       currentState = ADMIN;
       previousState = SERVICE;
       first_iteration = true;
       first_iteration_product = true;
+
+      current_admin_index = INITIAL_INDEX;
+      current_admin_option = &admin_options[current_admin_index];
+
+      display(current_admin_option->line);
     }
   }
 
@@ -173,20 +243,20 @@ void button_pressed() {
 
 // AHORA CON DEBOUNCE
 void joystick_pressed() {
-  unsigned long current_time = millis();
-  
+  unsigned long now = millis();
+
   // Comprobamos el tiempo entre el ruido
-  if (current_time - last_joystick_press_time > JOYSTICK_DEBOUNCE_DELAY) {
-    last_joystick_press_time = current_time;
+  if (now - last_joystick_press_time > JOYSTICK_DEBOUNCE_DELAY) {
+    last_joystick_press_time = now;
     joystick_bool = true;
-    current_admin_option_activated = true;
-    current_product_option_activated = true;
   }
   // Si es el tiempo es menor que el estipulado, es ruido
 }
 
 void setup() {
   Serial.begin(9600);
+  wdt_disable();
+  wdt_enable(WDTO_8S);
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
 
@@ -210,8 +280,8 @@ double get_distance() {
   digitalWrite(PIN_TRIG, HIGH);
   delayMicroseconds(10);
   digitalWrite(PIN_TRIG, LOW);
-  double dis = pulseIn(PIN_ECHO, 255);
-  return dis * METER_LIGHT_SPEED_CONVERSION_FACTOR;
+  double dis = pulseIn(PIN_ECHO, HIGH);
+  return dis * METER_SOUND_SPEED_CONVERSION_FACTOR;
 }
 
 void display(const char* message) {
@@ -222,22 +292,23 @@ void display(const char* message) {
   lcd.clear();
 
   lcd.setCursor(0, 0);
-  for (int i = 0; i < 16 && message[i] != '\0'; i++) {
+  for (int i = 0; i < MAX_CHARPTR_PER_SCREEN && message[i] != '\0'; i++) {
     lcd.print(message[i]);
   }
 
   int len = strlen(message);
-  if (len > 16) {
+  if (len > MAX_CHARPTR_PER_SCREEN) {
     lcd.setCursor(0, 1);
-    for (int i = 16; i < 32 && message[i] != '\0'; i++) {
+    for (int i = MAX_CHARPTR_PER_SCREEN;
+         i < LCD_MAX_CHARS && message[i] != '\0'; i++) {
       lcd.print(message[i]);
     }
   }
 }
 
 void displayProduct(const Product* p) {
-  char price_str[10];
-  char msg[32];
+  char price_str[MAX_PRICE_CHAR];
+  char msg[LCD_MAX_CHARS];
 
   // Para que no me de problemas de conversion busqué una función
   // helper
@@ -252,19 +323,24 @@ JoystickMove detect_move(int x, int y) {
       y <= CENTER_Y_MAX)
     return JS_CENTER;
 
-  if (x > 220 && x < 1100 && y == 0) return JS_UP;
-
-  if (x > 200 && x < 900 && y > 920) return JS_DOWN;
-
-  if (y > 243 && y < 1010 && x == 0) return JS_LEFT;
-
-  if (y > 243 && y < 1010 && x == 1023) return JS_RIGHT;
+  if (x > THRESHOLD_JU_XINFIMO && x < THRESHOLD_JU_XSUPREMO &&
+      y == THRESHOLD_JU_Y)
+    return JS_UP;
+  if (x > THRESHOLD_JD_XINFIMO && x < THRESHOLD_JD_XSUPREMO &&
+      y > THRESHOLD_JD_Y)
+    return JS_DOWN;
+  if (y > THRESHOLD_JLJR_YINFIMO && y < THRESHOLD_JLJR_YSUPREMO &&
+      x == THRESHOLD_JL_X)
+    return JS_LEFT;
+  if (y > THRESHOLD_JLJR_YINFIMO && y < THRESHOLD_JLJR_YSUPREMO &&
+      x == THRESHOLD_JR_X)
+    return JS_RIGHT;
 
   return JS_CENTER;
 }
 
 void handle_service_move(JoystickMove move) {
-  if (move == JS_UP && current_product_index > 0) {
+  if (move == JS_UP && current_product_index > INITIAL_INDEX) {
     current_product_index--;
     current_product = &products[current_product_index];
     displayProduct(current_product);
@@ -278,7 +354,7 @@ void handle_service_move(JoystickMove move) {
 }
 
 void handle_admin_move(JoystickMove move) {
-  if (move == JS_UP && current_admin_index > 0 &&
+  if (move == JS_UP && current_admin_index > INITIAL_INDEX &&
       !current_admin_option->active) {
     current_admin_index--;
     current_admin_option = &admin_options[current_admin_index];
@@ -301,9 +377,9 @@ void handle_admin_move(JoystickMove move) {
 void handle_prices_move(JoystickMove move) {
   if (move == JS_UP) {
     if (current_product->active) {
-      current_product->price += 0.01;
+      current_product->price += CHANGING_VALUE_PRICE;
     } else {
-      if (current_product_index > 0) {
+      if (current_product_index > INITIAL_INDEX) {
         current_product_index--;
         current_product = &products[current_product_index];
       }
@@ -314,7 +390,7 @@ void handle_prices_move(JoystickMove move) {
 
   if (move == JS_DOWN) {
     if (current_product->active) {
-      current_product->price -= 0.01;
+      current_product->price -= CHANGING_VALUE_PRICE;
     } else {
       if (current_product_index < PRODUCTS_SIZE - 1) {
         current_product_index++;
@@ -330,8 +406,11 @@ void handle_prices_move(JoystickMove move) {
       currentState = ADMIN;
       current_admin_option->active = false;
       display(current_admin_option->line);
-    } else {  // ESTO FUNCIONA- problema current_product->active hace lo que le da la gana
-      current_product->price = temporary_storage_for_mod_price_non_confirmed; // REVERT TO ORIGINAL VALUE BEFORE LAST MOD
+    } else {
+      current_product->price =
+          temporary_storage_for_mod_price_non_confirmed;  // REVERT TO ORIGINAL
+                                                          // VALUE BEFORE LAST
+                                                          // MOD
       current_product->active = false;
       displayProduct(current_product);
     }
@@ -369,40 +448,38 @@ void joystick_read(int choice) {
 }
 
 void displayTemp() {
-  if (now - last_check_time >= 200.0) {
+  if (nonBlockingDelay(1)) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Temp: ");
-    lcd.print(dht.readHumidity());
+    lcd.print(dht.readTemperature());
     lcd.setCursor(0, 1);
     lcd.print("Hum: ");
-    lcd.print(dht.readTemperature());
-    last_check_time = now;
+    lcd.print(dht.readHumidity());
   }
 }
 
 void displayDist() {
-  if (now - last_check_time >= 200.0) {
+  if (nonBlockingDelay(1)) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(get_distance());
-    last_check_time = now;
   }
 }
 
 void seeCounter() {
-  if (now - last_check_time >= 1000.0) {
-    int time = (now - START_TIME) / 1000.0;
+  const int interval_time = 1;
+  if (nonBlockingDelay(interval_time)) {
+    int time = (now - START_TIME) / SECOND_CONVERSION_FACTOR;
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(time);
-    last_check_time = now;
   }
 }
 
 void modifyPrice() {
   if (first_iteration_product) {
-    current_product_index = 0;
+    current_product_index = INITIAL_INDEX;
     current_product = &products[current_product_index];
     displayProduct(current_product);
     first_iteration_product = false;
@@ -410,13 +487,13 @@ void modifyPrice() {
 }
 
 void retirarBebida() {
-  if (now - last_check_time >= 1000.0) {
+  if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
     counter++;
     last_check_time = now;
   }
-  if (counter == 3) {
+  if (counter == RETIRAR_TIME) {
     displayProduct(current_product);
-    analogWrite(LED2, 0);
+    analogWrite(LED2, LOW_VALUE_PWM);
     counter = 0;
     increasing_led_value = 0;
     current_product->active = false;
@@ -425,15 +502,13 @@ void retirarBebida() {
   }
 }
 void prepararBebida(int time) {
-  if (now - last_check_time >= 1000.0) {
+  if (now - last_check_time >= SECOND_CONVERSION_FACTOR) {
     counter++;
     increasing_led_value =
-        increasing_led_value + 255 / time;  // HIGH = 255 tal que 255 / time = prop value
+        increasing_led_value +
+        HIGH_VALUE_PWM / time;  // HIGH = 255 tal que 255 / time = prop value
     analogWrite(LED2, increasing_led_value);
     last_check_time = now;
-    Serial.println("----");
-    Serial.println(counter);
-    Serial.println(time);
   }
   if (counter == time) {
     counter = 0;
@@ -444,6 +519,8 @@ void prepararBebida(int time) {
 }
 
 void loop() {
+  wdt_reset();  // A veces se bloquea en SERVICIO por las funcionalidades de
+                // humidity
   now = millis();
 
   /*Necesitamos que estas funciones se ejecuten continuamente
@@ -452,15 +529,14 @@ void loop() {
   if (led_bool) {
     if (led_start == 0) {
       display("CARGANDO");
-      digitalWrite(LED1, 255);
+      digitalWrite(LED1, HIGH);
       led_start = millis();
-      Serial.println("led started");
     }
 
     unsigned long now = millis();
     unsigned long elapsed = now - led_start;
 
-    if (elapsed >= 1000) {
+    if (elapsed >= SECOND_CONVERSION_FACTOR) {
       digitalWrite(LED1, !digitalRead(LED1));
       led_start = now;
 
@@ -468,7 +544,7 @@ void loop() {
         counter++;
       }
 
-      if (counter >= 3) {
+      if (counter >= LED_BLINK_COUNT) {
         digitalWrite(LED1, LOW);
         counter = 0;
         led_start = 0;
@@ -485,21 +561,18 @@ void loop() {
 
   if (joystick_bool) {
     joystick_bool = false;
-    
+
     if (currentState == ADMIN) {
-      Serial.println("I SAID ADMIN OP ACTIVE");
       current_admin_option->active = true;
     } else if (currentState == SERVICE) {
-      Serial.println("product on serv is on");
       current_product->active = true;
     } else if (currentState == PRICES || currentState == SERVICE) {
       if (!current_product->active) {
-        Serial.println("product is on");
         temporary_storage_for_mod_price_non_confirmed = current_product->price;
         current_product->active = true;
       } else {
-        current_product->active = false; // Salir de la seleccion
-        displayProduct(current_product); // Seguimos con el menú
+        current_product->active = false;  // Salir de la seleccion
+        displayProduct(current_product);  // Seguimos con el menú
       }
     }
   }
@@ -510,70 +583,66 @@ void loop() {
       product_or_admin = 1;
 
       // Add an if on if  ledes on, turn off
-      analogWrite(LED1, 0);
-      analogWrite(LED2, 0);
-      bool person_now_detected = false;
+      analogWrite(LED1, LOW_VALUE_PWM);
+      analogWrite(LED2, LOW_VALUE_PWM);
       double distance = get_distance();
+      bool person_now_detected = (distance < PERSON_DETECTION_MAX_DISTANCE);
+
       unsigned long millisStart = millis();
 
-      // Si es la primera iteración de SERVICE al entrar
-      // y si el sensor de ultrasonidos ha tenido un cambio de estado
-      if (first_iteration ||
-          !person_now_detected != previously_detected_person) {
+      // Si el sensor de ultrasonidos ha tenido un cambio de estado
+      if (person_now_detected != previously_detected_person) {
         // Este if creo que me sobra
-        if (previousState != currentState) {
-          if (!person_now_detected) {  // Cambiar boolean (era para
-                                       // implementarlo porque me daba errores)
-            if (first_iteration) {     // Esta es redundant no?
-              previousState = currentState;
-              current_product_index = 0;
-              current_product = &products[current_product_index];
-              displayProduct(current_product);
-              first_iteration = false;
-            }
+        if (person_now_detected) {
+          previousState = currentState;
+          current_product_index = INITIAL_INDEX;
+          current_product = &products[current_product_index];
+          float h = dht.readHumidity();
+          float t = dht.readTemperature();
+
+          if (isnan(h) || isnan(t)) {
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("Fallo lectura DHT");
           } else {
-            display("ESPERANDO CLIENTE");
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print("Temp: ");
+            lcd.print(t);
+            lcd.setCursor(0, 1);
+            lcd.print("Hum: ");
+            lcd.print(h);
           }
-          previously_detected_person = person_now_detected;
-          first_iteration = false;
+        } else {
+          display("ESPERANDO CLIENTE");
+          showHumidityOnce = true;
         }
+        previously_detected_person = person_now_detected;
+      }
+      if (person_now_detected && showHumidityOnce) {
+        const int time_hum_temp_action = 5;
+        if (nonBlockingDelay(time_hum_temp_action)) {
+          showHumidityOnce = false;
+          displayProduct(current_product);
+        }
+      } else if (person_now_detected && !showHumidityOnce) {
+        joystick_read(product_or_admin);
 
-        previousState = currentState;
-        if (!person_now_detected) {
-          joystick_read(product_or_admin);
+        if (current_product->active) {
+          counter = 0;
+          last_check_time = now;
 
-          if (current_product->active) {
-            counter = 0;
-            last_check_time = now;
-
-            preparation_time = random(4, 8);
-            previousState = currentState;
-            currentState = PREPARING;
-            display("PREPARANDO CAFE...");
-          }
+          preparation_time = random(PREP_TIME_MIN, PREP_TIME_MAX);
+          previousState = currentState;
+          currentState = PREPARING;
+          display("PREPARANDO CAFE...");
         }
       }
       break;
     }
 
     case PREPARING: {
-      switch (current_product->id) {
-        case 0:
-          prepararBebida(preparation_time);
-          break;
-        case 1:
-          prepararBebida(preparation_time);
-          break;
-        case 2:
-          prepararBebida(preparation_time);
-          break;
-        case 3:
-          prepararBebida(preparation_time);
-          break;
-        case 4:
-          prepararBebida(preparation_time);
-          break;
-      }
+      prepararBebida(preparation_time);
       break;
     }
 
@@ -588,9 +657,9 @@ void loop() {
       if (previousState != currentState) {
         if (first_iteration) {
           previousState = currentState;
-          analogWrite(LED1, 255);
-          analogWrite(LED2, 255);
-          current_admin_index = 0;
+          analogWrite(LED1, HIGH_VALUE_PWM);
+          analogWrite(LED2, HIGH_VALUE_PWM);
+          current_admin_index = INITIAL_INDEX;
           current_admin_option = &admin_options[current_admin_index];
           display(current_admin_option->line);
           first_iteration = false;
@@ -623,10 +692,9 @@ void loop() {
       product_or_admin = 1;  // Va a modificar los precios
 
       if (previousState != currentState) {
-        if (first_iteration) {  // Esta es redundant no?
-          Serial.println("I reached first it of PRICES");
+        if (first_iteration) {
           previousState = currentState;
-          current_product_index = 0;
+          current_product_index = INITIAL_INDEX;
           current_product = &products[current_product_index];
           displayProduct(current_product);
           first_iteration = false;
