@@ -46,13 +46,13 @@ The vending machine can:
 - Modify product prices in admin mode
 - Simulate preparation and delivery of drinks using intensity of LED2
 ## Components
-● Arduino UNO
-● LCD
-● Joystick (4 legs, dual-axis)
-● DHT11 Sensor for Temperature/Humidity
-● Ultrasonic Sensor (HC-SR04)
-● Push Button
-● 2 normal LEDs (LED1, LED2)
+- Arduino UNO
+- LCD
+- Joystick (5 legs, dual-axis)
+- DHT11 Sensor for Temperature/Humidity
+- Ultrasonic Sensor (HC-SR04)
+- Push Button
+- 2 normal LEDs (LED1, LED2)
 ## Usage
 The usage is simple, once the wiring is set on the breadboard, the machine goes into SERVICE state.
 Use the joystick to navigate menus:
